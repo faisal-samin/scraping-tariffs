@@ -1,0 +1,380 @@
+---
+title: "UK Trade Tariff - Notebook"
+author: "Faisal Samin"
+date: "10/12/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Loading libraries
+
+Try executing this chunk by clicking the *Run* button within the chunk ( the "play" button, green triangle) or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r message=FALSE, warning=FALSE}
+library(here)                    # Improved pathing for files
+library(tidyverse)               # Data manipulation, reading, pipes
+library(rvest)                   # Web-scraping
+library(tictoc)                  # Timing processes
+library(janitor)                 # General purpose cleaning funcs
+```
+
+## Introduction to web-scraping 
+
+When beginning with web-scraping, it's first useful to understand the basics of HTML. HTML stands for Hyper-text Markup Language, which is a mark-up language. It is used to declare the structure of a website in a semantic way. 
+
+Review some of the basics here: https://www.w3schools.com/html/html_basic.asp
+
+We can read in HTML with the rvest library.
+
+## Using rvest
+
+Let's experiment with some basic HTML code. 
+
+```{r}
+html_dit_raw <- '
+<html> 
+  <body> 
+    <h1>DIT is the best!</h1>
+    <p>They have the most interesting policy area!</p>
+    <p>The analysts are great to boot.</p>
+    <img src="logo.jpg" alt="DIT logo" width="300" height="100">
+  </body> 
+</html>'
+```
+
+We can store this in a file with a HTML extension and it will generate a website.
+
+```{r}
+# read html contents into R
+html_dit <- read_html(html_dit_raw)
+```
+
+It is useful to think of websites as a tree structure, see an example here: https://www.researchgate.net/figure/HTML-source-code-represented-as-tree-structure_fig10_266611108. Note that divs are general purpose containers that can be used in HTML.
+
+You can view the HTML structure of a website as follows.
+
+```{r}
+# print hierarchy
+xml_structure(html_dit)
+```
+
+## Experimenting with a website
+
+Let's explore an active website. We can use the read_html to directly query a website.
+
+```{r}
+# This is a list of the top video games of all time
+games <- read_html("https://www.metacritic.com/browse/games/score/metascore/all")
+```
+
+The best way to review and isolate a part of a website you'd like to extract is using the Developer Tools on Chrome (or on most other browsers). Once you've identified the hierarchy of tags or classes to navigate throught to get your data, you can then use rvest. In the snippet below we extract all of the video game titles.
+
+```{r}
+# Grabbing the video game title. When experimenting, its best to use the singular html_node
+# Once you're happy that it works, you can then extract all nodes.
+games %>% 
+  html_node(".clamp-list .clamp-summary-wrap h3") %>% 
+  html_text()
+```
+
+Extracting all video game titles...
+
+```{r}
+# Using html_nodes
+games %>% 
+  html_nodes(".clamp-list .clamp-summary-wrap h3") %>% 
+  html_text()
+```
+
+Let's try extracting the platform of the video games.
+
+```{r}
+games %>% 
+  html_node(".clamp-list .clamp-details .platform .data") %>% 
+  html_text() %>% 
+  stringr::str_squish() # cleans up text
+```
+
+Rinsing and repeating with each bit of data that we're interested in, and selecting the right classes, we can build a dataframe of this information.
+
+```{r}
+games_df <- tibble(
+  title = games %>% 
+    html_nodes(".clamp-list .clamp-summary-wrap h3") %>% 
+    html_text(),
+  platform = games %>% 
+    html_nodes(".clamp-list .clamp-details .platform .data") %>% 
+    html_text() %>% 
+    stringr::str_squish(), # cleans up text
+  release_date = games %>% 
+    html_nodes(".clamp-list .clamp-details") %>%
+    html_nodes("span") %>% 
+    html_text() %>% 
+    magrittr::extract(seq(3,300,3)), # extract every 3rd span element
+  description = games %>% 
+    html_nodes(".clamp-list .clamp-summary-wrap .summary") %>% 
+    html_text() %>% 
+    stringr::str_squish(),
+  meta_rating = games %>% 
+    html_nodes(".browse-list-large .browse-score-clamp .clamp-metascore, .browse-list-large .browse-score-clamp .clamp-userscore .metascore_anchor") %>% # requires more in-depth navigation of nodes
+    html_children() %>% 
+    magrittr::extract(seq(2,300,3)) %>% 
+    html_text() %>% 
+    str_squish(),
+  user_rating = games %>% 
+    html_nodes(".browse-list-large .browse-score-clamp .clamp-metascore, .browse-list-large .browse-score-clamp .clamp-userscore .metascore_anchor") %>% 
+    html_children() %>% 
+    magrittr::extract(seq(3,300,3)) %>% 
+    html_text() %>% 
+    str_squish()
+)
+```
+
+
+## Intro to R Selenium 
+
+The content in the previous website and most other websites is readily available for scraping. You can read in the HTML contents into R and then extract what's required. However, in other websites, data may be hidden behind user actions such as clicking, or filling in forms. This is where a tool such as Selenium is useful. 
+
+Selenium is a web-automation tool which literally 'drives' your browser and mimics the actions of an actual user. It's not as quick as other methods as it has to render the website in the browser but unlocks a lot of information for scraping. In the case of the TARIC website, the user needs to run queries to dynamically pull data from databases so Selenium is our only option.
+
+```{r}
+library(RSelenium)
+```
+
+We first open up a browser. The code below loads a light instance of Chrome onto your machine that it can then load and work with. A couple of points to bear in mind:
+* if you get an error based on the port option, try changing the number to something else. 
+* if there is an error with the chrome version, you should get a prompt with supported versions appearing.
+
+```{r}
+# additional parameters for Selenium
+# fix a hanging issue: 
+eCaps <- list(chromeOptions = list(
+  args = c('--disable-gpu', '--window-size=1280,800')
+))
+
+rD <- rsDriver(browser = "chrome", 
+               port = 4080L, # change port as required
+               chromever = "86.0.4240.22", # may need to update version
+               verbose = F)
+
+# Assigns browser client to an object, remDr
+remDr <- rD[["client"]]
+```
+
+We can then navigate to a website.
+
+```{r}
+# Saving the url as a variable
+taric_url <- "https://ec.europa.eu/taxation_customs/dds2/taric/quota_consultation.jsp?Lang=en&Origin=&Code=&Year=2021&Year=2020&Year=2019&Year=2018&Year=2017&Critical=&Status=&Expand=true"
+```
+
+```{r}
+# Navigating to the URL
+remDr$navigate(taric_url)
+```
+
+Great, we're now ready to begin scraping!
+
+## Scraping with RSelenium
+
+We begin by setting up an empty dataframe for us to collect our TRQ data
+
+```{r}
+# Set up empty data-frame for collecting data
+trq_final <- data.frame()
+```
+
+```{r}
+# Save HTML of current web-page
+html <- remDr$getPageSource()[[1]]
+```
+
+The contents of the table within the TARIC website are dynamically queried. We need to use RSelenium first to mimic the actions of a user to launch the website, and then use rvest as before.
+
+```{r}
+# scrape main quota table
+trq_table <- read_html(html) %>%
+  html_node("#quotaTable") %>%
+  html_table(fill = TRUE) %>% 
+  select(-"") # remove final column
+```
+
+If all we needed was the data in the main table, that would be a fairly simple job. However, we need to build a loop to go into each of the "More info" links, grab extra data for each row and rinse and repeat for each row in the main table.
+
+In Selenium, we can type in code to give a set of instructions to carry this out for us.
+
+We first instruct selenium to store a list of the "More info" links.
+
+```{r}
+# Getting the "More Info" fields
+webElems <- remDr$findElements("partial link text", "More info")
+# sapply(webElems, function(x) x$getElementText()) # to print out the contents
+```
+
+We then store their locations on the web-page. Let's do this for the first link that we're about to dive into.
+
+```{R}
+loc <- webElems[[1]]$getElementLocation()
+# loc[c('x','y')]
+``` 
+
+We can move the mouse to that location...
+
+```{r}
+remDr$mouseMoveToLocation(webElement = webElems[[1]]) # move mouse to the element we selected
+```
+
+... and click the link!
+
+```{r}
+remDr$click(1)
+```
+
+We're now in the details for that first row in the tariff table. We can then extract this using rvest and some dplyr to clean it up.
+
+```{r}
+trq_more_info <- remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_node("#quotaTable") %>%
+  html_table(fill = TRUE, trim = TRUE) %>% # fill = TRUE due to different number of rows in each column 
+  .[,1:2] %>% # some table entries are tables themselves, this keeps the df to two columns
+  t() %>% # transpose
+  as.data.frame()
+```
+
+Some of these Tariff quota details have tables within the tables (for very large entries) so we use a bit of code to trim these down to the same number of columns across all searches
+
+```{r}
+# Resizing table for embedded tables in rows
+if (ncol(trq_more_info) >= 17) { # we shouldn't see 17 or more columns
+  trq_more_info <- trq_more_info %>% select(-(paste0("V", seq(8, ncol(trq_more_info) - 9)))) # removes intermediate cols
+}
+```
+
+A final bit of cleaning
+
+```{r}
+# set row names and clean
+trq_more_info_df <- trq_more_info %>% 
+  janitor::row_to_names(1) %>% 
+  janitor::clean_names()
+```
+
+We can then use Selenium to navigate back
+
+```{r}
+remDr$goBack()
+```
+
+You now have a picture of how we can use Selenium, rvest and by setting up some loops, we can kick off a process to scrape all of TARIC. 
+
+The full code that achieves this is below! This takes upto 3 hours, connection and throttling dependent.
+
+```{r}
+# Takes over 3 hours to run!
+tic()
+while (TRUE) {
+  
+  # Load page
+  Sys.sleep(2) # being gentle with their server
+  html <- remDr$getPageSource()[[1]]
+  
+  # Scrapes main quota table
+  trq_table <- read_html(html) %>%
+    html_node("#quotaTable") %>% 
+    html_table(fill = TRUE) %>% 
+    select(-"") # remove final column
+  
+  # Getting the "More Info" fields
+  webElems <- remDr$findElements("partial link text", "More info")
+  sapply(webElems, function(x) x$getElementText())
+  
+  loc <- webElems[[1]]$getElementLocation()
+  # loc[c('x','y')]
+  
+  remDr$mouseMoveToLocation(webElement = webElems[[1]]) # move mouse to the element we selected
+  remDr$click(1) # 2 indicates click the right mouse button
+  
+  # Save df for initial "more info" section
+  
+  trq_more_info <- remDr$getPageSource()[[1]] %>% 
+    read_html() %>%
+    html_node("#quotaTable") %>% 
+    html_table(fill = TRUE, trim = TRUE) %>% # fill = TRUE due to different number of rows in each column 
+    .[,1:2] %>% # some table entries are tables themselves, this keeps the df to two columns
+    t() %>%
+    as.data.frame()
+  
+  # Resizing table for embedded tables in rows
+  if (ncol(trq_more_info) >= 17) {
+    trq_more_info <- trq_more_info %>% select(-(paste0("V", seq(8, ncol(trq_more_info) - 9))))
+  }
+  
+  # set row names and clean
+  trq_more_info_df <- trq_more_info %>% 
+    row_to_names(1) %>% 
+    clean_names()
+  
+  remDr$goBack()
+  
+  # if page (i.e. the final one) has only TRQ  
+  if (length(webElems) < 2) {
+    trq_final <- bind_rows(trq_final, trq_more_info_df)
+    print("Scraping complete!")
+    break
+  }
+  
+  # loop through all the More Info fields
+  
+  for (i in 2:length(webElems)) {
+    webElems <- remDr$findElements("partial link text", "More info")
+    loc <- webElems[[i]]$getElementLocation()
+    
+    remDr$mouseMoveToLocation(webElement = webElems[[i]]) # move mouse to the element we selected
+    remDr$click(1) # 2 indicates click the right mouse button
+    
+    scrape_table_loop <- remDr$getPageSource()[[1]] %>% 
+      read_html() %>%
+      html_node("#quotaTable") %>% 
+      html_table(fill = TRUE, trim = TRUE) %>% # fill = TRUE due to different number of rows in each column 
+      .[,1:2] %>% # some table entries are tables themselves, this keeps the df to two columns
+      t() %>%
+      as.data.frame() %>% 
+      slice(2)
+    
+    # Resizing table for large entries in transferred amount
+    if (ncol(scrape_table_loop) >= 17) {
+      scrape_table_loop <- scrape_table_loop %>% select(-(paste0("V", seq(8, ncol(scrape_table_loop) - 9))))
+    }
+    
+    # set colnames
+    colnames(scrape_table_loop) <- colnames(trq_more_info_df)
+    
+    trq_more_info_df <- bind_rows(trq_more_info_df,
+                                  scrape_table_loop)
+    
+    remDr$goBack()
+    Sys.sleep(2)
+  }
+  
+  # bind columns
+  trq_joined <- bind_cols(trq_table, trq_more_info_df) %>% 
+    janitor::clean_names()
+  
+  # final dataset
+  trq_final <- bind_rows(trq_final, trq_joined)
+  
+  # Print for logging progress
+  cat("Scraped", nrow(trq_final), "rows\n")
+  
+  webElem <- remDr$findElement("partial link text", "Next")
+  
+  webElem$clickElement()
+}
+toc()
+```
+
+
+
+
