@@ -99,7 +99,7 @@ hs8 <- html %>%
   html_text()
 
 # To navigate across the codes, we may want to capture the locations
-elem_hs <- remDr$findElements(using = "xpath", '//*[@id="idfra"]/option[2]') # select from hs8 list
+elem_hs <- remDr$findElements(using = "xpath", '//*[@id="idfra"]/option') # select from hs8 list
 #elems_hs <- remDr$findElements(using = "xpath", '//*[@id="idfra"]') # get list
 sapply(elem_hs, function(x) x$getElementText())
 
@@ -118,6 +118,8 @@ remDr$click(1)
 # before the years are clicked, it should be fine.
 
 elem_year <- remDr$findElements("class name", "linksmensuales")
+elem_year <- remDr$findElements(using = "xpath", '//*[@id="tabla"]/span[1]/a')
+
 sapply(elem_year, function(x) x$getElementText()) # to print out the contents to verify
 
 # store selected year
@@ -137,25 +139,45 @@ remDr$click(1)
 exports_valor <- remDr$getPageSource()[[1]] %>% # re-read the page source as it's changed
   read_html() %>%
   html_node(xpath = "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[4]") %>% 
-  html_table()
+  html_table() %>% 
+  as_tibble(.name_repair = "unique") %>%
+  .[,1:13] %>% 
+  mutate(name = "Exports Valor", .before = "País")
+
+names(exports_valor) <- html_col_names
 
 # 2) Exports - volume
 exports_volume <- remDr$getPageSource()[[1]] %>% # re-read the page source as it's changed
   read_html() %>%
   html_node(xpath = "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[6]") %>% 
-  html_table()
+  html_table() %>% 
+  as_tibble(.name_repair = "unique") %>%
+  .[,1:13] %>% 
+  mutate(name = "Exports Volume", .before = "País")
+
+names(exports_volume) <- html_col_names
 
 # 3) Imports - valor
 imports_valor <- remDr$getPageSource()[[1]] %>% # re-read the page source as it's changed
   read_html() %>%
   html_node(xpath = "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[8]") %>% 
-  html_table()
+  html_table() %>% 
+  as_tibble(.name_repair = "unique") %>%
+  .[,1:13] %>% 
+  mutate(name = "Imports Valor", .before = "País")
+
+names(imports_valor) <- html_col_names
 
 # 4) Imports - volume
 imports_volume <- remDr$getPageSource()[[1]] %>% # re-read the page source as it's changed
   read_html() %>%
   html_node(xpath = "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[10]") %>% 
-  html_table()
+  html_table() %>% 
+  as_tibble(.name_repair = "unique") %>%
+  .[,1:13] %>% 
+  mutate(name = "Imports Volume", .before = "País")
+
+names(imports_volume) <- html_col_names
 
 # Note: 020120 for 2020 has a lot of detail in the table - broken down by country
 # Once that's done we just need to combine the data into one dataframe
@@ -173,6 +195,7 @@ imports_volume <- remDr$getPageSource()[[1]] %>% # re-read the page source as it
 df_master <- tibble::tibble(
   hs_code = character(),
   year = character(),
+  name = character(),
   País = character(),
   Enero = character(),
   Febrero = character(),
@@ -190,10 +213,10 @@ df_master <- tibble::tibble(
 
 # 2 select, bind and add to master df
 
-df_loop <-  bind_rows(exports_valor[,1:13],
-                       exports_volume[,1:13],
-                       imports_valor[,1:13],
-                       imports_volume[,1:13]) %>% 
+df_loop <-  bind_rows(exports_valor,
+                       exports_volume,
+                       imports_valor,
+                       imports_volume) %>% 
   mutate(hs_code = selected_code,
          year = selected_year)
 
