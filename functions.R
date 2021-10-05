@@ -15,96 +15,107 @@ run_scrape <- function(sleep_time) {
   # Testing elem codes - optional
   # sapply(elem_hs6, function(x) x$getElementText())
   
+  tic()
+  # 2nd loop - loop through HS4 codes
   df_hs4 <- initiate_df()
-  # 3rd loop - loop through HS6 codes
-  for (i in 1:length(elem_hs6)) {
-    df_hs6 <- initiate_df()
+  for (i in 1:length(elem_hs4)){
     
-    # move mouse to hs6 code
-    remDr$mouseMoveToLocation(webElement = elem_hs6[[i]])
+    # move mouse to hs4 code
+    remDr$mouseMoveToLocation(webElement = elem_hs4[[i]])
     #click
     remDr$click(1)
     
     Sys.sleep(sleep_time)
     refresh_elements()
     
-    # 4th loop - loop through HS8 codes
-    for (i in 1:length(elem_hs8)) {
+    df_hs6 <- initiate_df()
+    # 3rd loop - loop through HS6 codes
+    for (i in 1:length(elem_hs6)) {
       
-      df_hs8 <- initiate_df()
-      
-      # move mouse to hs8 code
-      remDr$mouseMoveToLocation(webElement = elem_hs8[[i]])
+      # move mouse to hs6 code
+      remDr$mouseMoveToLocation(webElement = elem_hs6[[i]])
       #click
       remDr$click(1)
       
-      #print(paste0("Sleeping.... zzz ", Sys.time()))
-      # sleep to wait for tables to load
       Sys.sleep(sleep_time)
-      #print(paste0("Awake! ", Sys.time()))
-      
       refresh_elements()
       
-      # Store selected HS8 code
-      selected_code <- elem_hs8[[i]]$getElementText()[[1]]
-      
-      # 5th loop - loop through each year (we only want first 3 years)
-      df_year <- initiate_df()
-      for (i in 1:3) {
+      # 4th loop - loop through HS8 codes
+      df_hs8 <- initiate_df()
+      for (i in 1:length(elem_hs8)) {
+        # move mouse to hs8 code
+        remDr$mouseMoveToLocation(webElement = elem_hs8[[i]])
+        #click
+        remDr$click(1)
         
-        # Try/Catch for error handling when gathering table data 
-        # This is required as sometimes the tables can take very long to load (30 seconds)
-        # Only required for first table, as, if it loads, the others should also load
+        #print(paste0("Sleeping.... zzz ", Sys.time()))
+        # sleep to wait for tables to load
+        Sys.sleep(sleep_time)
+        #print(paste0("Awake! ", Sys.time()))
         
-        exports_valor <- NULL
-        while(is.null(exports_valor)) {
-          exports_valor <- tryCatch({
-            # move mouse to year
-            remDr$mouseMoveToLocation(webElement = elem_year[[i]])
-            # and then click
-            remDr$click(1)
-            
-            print(paste0("Sleeping.... zzz ", Sys.time()))
-            Sys.sleep(sleep_time)
-            print(paste0("Awake! ", Sys.time()))
-            
-            refresh_elements()
-            
-            exports_valor <- gather_table("Exports valor", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[4]")},
-            error = function(e){NULL})
+        refresh_elements()
+        
+        # Store selected HS8 code
+        selected_code <- elem_hs8[[i]]$getElementText()[[1]]
+        
+        # 5th loop - loop through each year (we only want first 3 years)
+        df_year <- initiate_df()
+        for (i in 1:3) {
+          # Try/Catch for error handling when gathering table data 
+          # This is required as sometimes the tables can take very long to load (30 seconds)
+          # Only required for first table, as, if it loads, the others should also load
           
-          # Click again
-          # remDr$click(1)
-          # print("tryCatch triggered!")
-          # Sys.sleep(10)
-          # 
-          # refresh_elements()
-        }
-        
-        exports_volume <- gather_table("Exports volume", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[6]")
-        imports_valor <- gather_table("Imports valor", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[8]")
-        imports_volume <- gather_table("Imports volume", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[10]")
-        
-        # Store selected year
-        selected_year <- elem_year[[i]]$getElementText()[[1]]
-        
-        df_year <- update_df(df_year, 
-                             exports_valor, 
-                             exports_volume,
-                             imports_valor,
-                             imports_volume)
-        
-        print(paste0(selected_code, " - ", selected_year))
-        
+          exports_valor <- NULL
+          while(is.null(exports_valor)) {
+            exports_valor <- tryCatch({
+              # move mouse to year
+              remDr$mouseMoveToLocation(webElement = elem_year[[i]])
+              # and then click
+              remDr$click(1)
+              
+              print(paste0("Sleeping.... zzz ", Sys.time()))
+              Sys.sleep(sleep_time)
+              print(paste0("Awake! ", Sys.time()))
+              
+              refresh_elements()
+              
+              exports_valor <- gather_table("Exports valor", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[4]")},
+              error = function(e){NULL})
+            
+            # Click again
+            # remDr$click(1)
+            # print("tryCatch triggered!")
+            # Sys.sleep(10)
+            # 
+            # refresh_elements()
+          }
+          
+          exports_volume <- gather_table("Exports volume", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[6]")
+          imports_valor <- gather_table("Imports valor", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[8]")
+          imports_volume <- gather_table("Imports volume", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[10]")
+          
+          # Store selected year
+          selected_year <- elem_year[[i]]$getElementText()[[1]]
+          
+          df_year <- update_df(df_year, 
+                               exports_valor, 
+                               exports_volume,
+                               imports_valor,
+                               imports_volume)
+          
+          print(paste0(selected_code, " - ", selected_year))
+        } # end of 5th loop
         # bind year loop with hs8 df
         df_hs8 <- bind_rows(df_hs8, df_year) %>% 
           unique() # safeguard against duplicates
-      } # end of 5th loop
-    
+      } # end of 4th loop
       df_hs6 <- bind_rows(df_hs6, df_hs8)
     }
     df_hs4 <- bind_rows(df_hs4, df_hs6)
   }
+  df_hs6 %>% write_csv("hs01_last_two_codes.csv")
+  
+  toc()
   
 }
     
