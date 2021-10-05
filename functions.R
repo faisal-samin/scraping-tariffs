@@ -1,10 +1,10 @@
 # Set of functions for different parts of the scraping pipeline
 
-sleep_time <- 10
-run_scrape <- function(sleep_time) {
-  # Inputs: sleep time in seconds between each click of year or code
+# sleep_time <- 8
+run_scrape <- function(hs2_code, sleep_time) {
+  # Inputs: selected hs2_code to scrape, sleep time in seconds between each click of year or code
   # Outputs: returns dataframe with scraped data
-  # Issues: this is initially set up just for HS1, will be later updated for all codes
+  # Issues: this only works for one HS2 code at a time
   
   # Refresh live html along with remDr elements of interest (hs code list, years)
   refresh_elements()
@@ -14,10 +14,18 @@ run_scrape <- function(sleep_time) {
   
   # Testing elem codes - optional
   # sapply(elem_hs6, function(x) x$getElementText())
+
+  # Select hs2 code
+  # move mouse to hs2 code
+  remDr$mouseMoveToLocation(webElement = elem_hs2[[hs2_code]])
+  #click
+  remDr$click(1)
   
-  tic()
-  # 2nd loop - loop through HS4 codes
-  df_hs4 <- initiate_df()
+  Sys.sleep(sleep_time)
+  refresh_elements()
+  
+  # 1st loop - loop through HS4 codes
+  df_hs4 <<- initiate_df()
   for (i in 1:length(elem_hs4)){
     
     # move mouse to hs4 code
@@ -28,8 +36,8 @@ run_scrape <- function(sleep_time) {
     Sys.sleep(sleep_time)
     refresh_elements()
     
-    df_hs6 <- initiate_df()
-    # 3rd loop - loop through HS6 codes
+    df_hs6 <<- initiate_df()
+    # 2nd loop - loop through HS6 codes
     for (i in 1:length(elem_hs6)) {
       
       # move mouse to hs6 code
@@ -40,8 +48,8 @@ run_scrape <- function(sleep_time) {
       Sys.sleep(sleep_time)
       refresh_elements()
       
-      # 4th loop - loop through HS8 codes
-      df_hs8 <- initiate_df()
+      # 3rd loop - loop through HS8 codes
+      df_hs8 <<- initiate_df()
       for (i in 1:length(elem_hs8)) {
         # move mouse to hs8 code
         remDr$mouseMoveToLocation(webElement = elem_hs8[[i]])
@@ -58,9 +66,9 @@ run_scrape <- function(sleep_time) {
         # Store selected HS8 code
         selected_code <- elem_hs8[[i]]$getElementText()[[1]]
         
-        # 5th loop - loop through each year (we only want first 3 years)
-        df_year <- initiate_df()
-        for (i in 1:3) {
+        # 5th loop - loop through each year (we only want 2020 and 2019)
+        df_year <<- initiate_df()
+        for (i in 2:3) {
           # Try/Catch for error handling when gathering table data 
           # This is required as sometimes the tables can take very long to load (30 seconds)
           # Only required for first table, as, if it loads, the others should also load
@@ -73,9 +81,9 @@ run_scrape <- function(sleep_time) {
               # and then click
               remDr$click(1)
               
-              print(paste0("Sleeping.... zzz ", Sys.time()))
+              #print(paste0("Sleeping.... zzz ", Sys.time()))
               Sys.sleep(sleep_time)
-              print(paste0("Awake! ", Sys.time()))
+              #print(paste0("Awake! ", Sys.time()))
               
               refresh_elements()
               
@@ -97,26 +105,24 @@ run_scrape <- function(sleep_time) {
           # Store selected year
           selected_year <- elem_year[[i]]$getElementText()[[1]]
           
-          df_year <- update_df(df_year, 
+          df_year <<- update_df(df_year, 
                                exports_valor, 
                                exports_volume,
                                imports_valor,
-                               imports_volume)
+                               imports_volume,
+                               selected_code,
+                               selected_year)
           
           print(paste0(selected_code, " - ", selected_year))
-        } # end of 5th loop
+        } # end of 4th loop
         # bind year loop with hs8 df
-        df_hs8 <- bind_rows(df_hs8, df_year) %>% 
-          unique() # safeguard against duplicates
-      } # end of 4th loop
-      df_hs6 <- bind_rows(df_hs6, df_hs8)
-    }
-    df_hs4 <- bind_rows(df_hs4, df_hs6)
-  }
-  df_hs6 %>% write_csv("hs01_last_two_codes.csv")
-  
-  toc()
-  
+        df_hs8 <<- bind_rows(df_hs8, df_year) %>% unique() # safeguard against duplicates
+      } # end of 3rd loop
+      df_hs6 <<- bind_rows(df_hs6, df_hs8)
+    } # end of 2nd loop
+    df_hs4 <<- bind_rows(df_hs4, df_hs6)
+  } # end of 1st loop
+  df_hs4 %>% write_csv(paste0("data/hs", hs2_code, "_data.csv"))
 }
     
 
@@ -179,7 +185,8 @@ initiate_df <- function() {
     Diciembre = character()
   )
 }
-update_df <- function(df_main, exports_val, exports_vol, imports_val, imports_vol) {
+update_df <- function(df_main, exports_val, exports_vol, imports_val, imports_vol,
+                      selected_code, selected_year) {
   # Update master df with cuts from the four tables
   # Inputs: master df, and four df from current web page
   # Outputs: binded df

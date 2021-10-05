@@ -4,6 +4,7 @@
 library(RSelenium)
 library(tidyverse)
 library(rvest)
+library(tictoc)
 source("functions.R") # source in code for scraper
 
 # Scraper -----------------------------------------------------------------
@@ -22,11 +23,12 @@ rD <- rsDriver(browser = "chrome",
 remDr <- rD[["client"]]
 
 # Run if needed to reset driver and browser client
-cleanup(rD, remDr)
+cleanup()
 
 # Navigating to the URL
 remDr$navigate(url)
 
 # Run scraper
-df_raw <- run_scrape(rD, remDr)
-
+tic()
+run_scrape(hs2_code = 2, sleep_time = 7) #hs98
+toc()
