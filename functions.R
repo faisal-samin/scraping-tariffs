@@ -21,7 +21,7 @@ run_scrape <- function(hs2_code, sleep_time) {
   #click
   remDr$click(1)
   
-  Sys.sleep(sleep_time)
+  Sys.sleep(4)
   refresh_elements()
   
   # 1st loop - loop through HS4 codes
@@ -33,7 +33,7 @@ run_scrape <- function(hs2_code, sleep_time) {
     #click
     remDr$click(1)
     
-    Sys.sleep(sleep_time)
+    Sys.sleep(4)
     refresh_elements()
     
     df_hs6 <<- initiate_df()
@@ -45,7 +45,7 @@ run_scrape <- function(hs2_code, sleep_time) {
       #click
       remDr$click(1)
       
-      Sys.sleep(sleep_time)
+      Sys.sleep(4)
       refresh_elements()
       
       # 3rd loop - loop through HS8 codes
@@ -58,7 +58,7 @@ run_scrape <- function(hs2_code, sleep_time) {
         
         #print(paste0("Sleeping.... zzz ", Sys.time()))
         # sleep to wait for tables to load
-        Sys.sleep(sleep_time)
+        Sys.sleep(4)
         #print(paste0("Awake! ", Sys.time()))
         
         refresh_elements()
@@ -73,29 +73,22 @@ run_scrape <- function(hs2_code, sleep_time) {
           # This is required as sometimes the tables can take very long to load (30 seconds)
           # Only required for first table, as, if it loads, the others should also load
           
+          # move mouse to year
+          remDr$mouseMoveToLocation(webElement = elem_year[[i]])
+          # and then click
+          remDr$click(1)
+          Sys.sleep(sleep_time)
+          
           exports_valor <- NULL
           while(is.null(exports_valor)) {
             exports_valor <- tryCatch({
-              # move mouse to year
-              remDr$mouseMoveToLocation(webElement = elem_year[[i]])
-              # and then click
-              remDr$click(1)
-              
-              #print(paste0("Sleeping.... zzz ", Sys.time()))
-              Sys.sleep(sleep_time)
-              #print(paste0("Awake! ", Sys.time()))
-              
+              Sys.sleep(1)
               refresh_elements()
-              
               exports_valor <- gather_table("Exports valor", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[4]")},
-              error = function(e){NULL})
-            
-            # Click again
-            # remDr$click(1)
-            # print("tryCatch triggered!")
-            # Sys.sleep(10)
-            # 
-            # refresh_elements()
+              error = function(e){
+                print("TryCatch triggered")
+                return(NULL)
+                })
           }
           
           exports_volume <- gather_table("Exports volume", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[6]")
@@ -106,10 +99,10 @@ run_scrape <- function(hs2_code, sleep_time) {
           selected_year <- elem_year[[i]]$getElementText()[[1]]
           
           df_year <<- update_df(df_year, 
-                               exports_valor, 
-                               exports_volume,
-                               imports_valor,
-                               imports_volume,
+                               exports_valor %>% mutate(across(everything(), as.character)), 
+                               exports_volume %>% mutate(across(everything(), as.character)),
+                               imports_valor %>% mutate(across(everything(), as.character)),
+                               imports_volume %>% mutate(across(everything(), as.character)),
                                selected_code,
                                selected_year)
           
@@ -124,7 +117,8 @@ run_scrape <- function(hs2_code, sleep_time) {
   } # end of 1st loop
   df_hs4 %>% write_csv(paste0("data/hs", hs2_code, "_data.csv"))
 }
-    
+
+#df_hs4 %>% write_csv(paste0("data/hs", "7", "_data_incomplete.csv"))
 
 gather_hs_codes <- function(xpath_hs) {
   # gathers HS codes in the form of Selenium Elements at the given xpath
