@@ -20,11 +20,11 @@ chrome_prefs =
     "profile.default_content_settings.popups" = 0L,
     "download.prompt_for_download" = FALSE)
 
-chrome_args = 
-  c(
+chrome_args = list(
+  '--window-size=1200,1800')
     # chrome command arguments
-    '--headless',
-    '--window-size=1200,1800')
+    #'--headless',
+    #'--window-size=1200,1800')
     #'--sessionTimeout 57868143'
 
 eCaps_notimeout = 
@@ -36,10 +36,10 @@ eCaps_notimeout =
 
 # Selenium driver kept outside of main function for quick config of ports and browserver
 rD <- rsDriver(browser = "chrome",
-               port = 4230L,
+               port = 4245L,
                chromever="94.0.4606.61",
                version = "3.141.59",
-               #extraCapabilities = eCaps_notimeout,
+               extraCapabilities = eCaps_notimeout,
                check = FALSE)
 
 # Assigns browser client to an object, remDr
@@ -60,7 +60,7 @@ rm(rD)
 remDr$navigate(url)
 
 # Run scraper
-for (i in 8:20) {
+for (i in 12:20) {
   tic()
   run_scrape(hs2_code = i, sleep_time = 4) %>% suppressMessages()
   toc()

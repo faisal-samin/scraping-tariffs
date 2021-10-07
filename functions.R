@@ -21,7 +21,7 @@ run_scrape <- function(hs2_code, sleep_time) {
   #click
   remDr$click(1)
   
-  Sys.sleep(4)
+  Sys.sleep(6)
   refresh_elements()
   
   # 1st loop - loop through HS4 codes
@@ -33,7 +33,7 @@ run_scrape <- function(hs2_code, sleep_time) {
     #click
     remDr$click(1)
     
-    Sys.sleep(4)
+    Sys.sleep(6)
     refresh_elements()
     
     df_hs6 <<- initiate_df()
@@ -45,7 +45,7 @@ run_scrape <- function(hs2_code, sleep_time) {
       #click
       remDr$click(1)
       
-      Sys.sleep(4)
+      Sys.sleep(6)
       refresh_elements()
       
       # 3rd loop - loop through HS8 codes
@@ -58,7 +58,7 @@ run_scrape <- function(hs2_code, sleep_time) {
         
         #print(paste0("Sleeping.... zzz ", Sys.time()))
         # sleep to wait for tables to load
-        Sys.sleep(4)
+        Sys.sleep(6)
         #print(paste0("Awake! ", Sys.time()))
         
         refresh_elements()
@@ -82,7 +82,7 @@ run_scrape <- function(hs2_code, sleep_time) {
           exports_valor <- NULL
           while(is.null(exports_valor)) {
             exports_valor <- tryCatch({
-              Sys.sleep(1)
+              Sys.sleep(3)
               refresh_elements()
               exports_valor <- gather_table("Exports valor", "/html/body/section/section[2]/div/div/table/tbody/tr/td/div[2]/table[4]")},
               error = function(e){
