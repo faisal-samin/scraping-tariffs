@@ -32,7 +32,7 @@ run_scrape <- function(hs2_code, hs4_code_start = NULL, sleep_time) {
   refresh_elements()
   
   # 1st loop - loop through HS4 codes
-  #df_hs4 <<- initiate_df()
+  df_hs4 <<- initiate_df()
   for (i in hs4_code_start:length(elem_hs4)){
     
     # move mouse to hs4 code
@@ -45,7 +45,7 @@ run_scrape <- function(hs2_code, hs4_code_start = NULL, sleep_time) {
     
     df_hs6 <<- initiate_df()
     # 2nd loop - loop through HS6 codes
-    for (i in 1:length(elem_hs6)) {
+    for (i in 16:length(elem_hs6)) {
       
       # move mouse to hs6 code
       remDr$mouseMoveToLocation(webElement = elem_hs6[[i]])

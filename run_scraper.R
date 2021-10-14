@@ -36,7 +36,7 @@ eCaps_notimeout =
 
 # Selenium driver kept outside of main function for quick config of ports and browserver
 rD <- rsDriver(browser = "chrome",
-               port = 4360L,
+               port = 4350L,
                chromever="94.0.4606.61",
                version = "3.141.59",
                extraCapabilities = eCaps_notimeout,
@@ -62,7 +62,7 @@ remDr$navigate(url)
 # Run scraper (29 remaining)
 for (i in c(29)) {
   tic()
-  run_scrape(hs2_code = i, hs4_code_start = 15, sleep_time = 4) %>% suppressMessages()
+  run_scrape(hs2_code = i, hs4_code_start = 22, sleep_time = 4) %>% suppressMessages()
   toc()
   beepr::beep(3)
   Sys.sleep(5)
