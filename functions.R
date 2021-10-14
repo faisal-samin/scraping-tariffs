@@ -1,13 +1,18 @@
 # Set of functions for different parts of the scraping pipeline
 
 # sleep_time <- 8
-run_scrape <- function(hs2_code, sleep_time) {
+run_scrape <- function(hs2_code, hs4_code_start = NULL, sleep_time) {
   # Inputs: selected hs2_code to scrape, sleep time in seconds between each click of year or code
+  # Inputs: (optional) hs4_code to start from
   # Outputs: returns dataframe with scraped data
   # Issues: this only works for one HS2 code at a time
   
+  # Navigating to the URL = this is to refresh the page to avoid issue with hs2 code
+  remDr$navigate(url)
+  
   # Refresh live html along with remDr elements of interest (hs code list, years)
   refresh_elements()
+  
   
   # initiate master df
   df_master <- initiate_df()
@@ -18,6 +23,8 @@ run_scrape <- function(hs2_code, sleep_time) {
   # Select hs2 code
   # move mouse to hs2 code
   remDr$mouseMoveToLocation(webElement = elem_hs2[[hs2_code]])
+  # pause until hs2 code is in view
+  Sys.sleep(1)
   #click
   remDr$click(1)
   
@@ -25,8 +32,8 @@ run_scrape <- function(hs2_code, sleep_time) {
   refresh_elements()
   
   # 1st loop - loop through HS4 codes
-  df_hs4 <<- initiate_df()
-  for (i in 1:length(elem_hs4)){
+  #df_hs4 <<- initiate_df()
+  for (i in hs4_code_start:length(elem_hs4)){
     
     # move mouse to hs4 code
     remDr$mouseMoveToLocation(webElement = elem_hs4[[i]])
@@ -118,7 +125,7 @@ run_scrape <- function(hs2_code, sleep_time) {
   df_hs4 %>% write_csv(paste0("data/hs", hs2_code, "_data.csv"))
 }
 
-#df_hs4 %>% write_csv(paste0("data/hs", "7", "_data_incomplete.csv"))
+#df_hs4 %>% write_csv(paste0("data/hs", "39", "_data_incomplete.csv"))
 
 gather_hs_codes <- function(xpath_hs) {
   # gathers HS codes in the form of Selenium Elements at the given xpath

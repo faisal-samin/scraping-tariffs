@@ -36,7 +36,7 @@ eCaps_notimeout =
 
 # Selenium driver kept outside of main function for quick config of ports and browserver
 rD <- rsDriver(browser = "chrome",
-               port = 4245L,
+               port = 4360L,
                chromever="94.0.4606.61",
                version = "3.141.59",
                extraCapabilities = eCaps_notimeout,
@@ -49,7 +49,7 @@ remDr <- rD[["client"]]
 #remDr$setTimeout(type = "implicit", milliseconds = 1000)
 
 # how long to wait until page times out (20 mins)
-remDr$setTimeout(type = "page load", milliseconds = 1200000)
+remDr$setTimeout(type = "page load", milliseconds = 12000000)
 
 # Run if needed to reset driver and browser client
 remDr$close()
@@ -59,10 +59,10 @@ rm(rD)
 # Navigating to the URL
 remDr$navigate(url)
 
-# Run scraper
-for (i in 12:20) {
+# Run scraper (29 remaining)
+for (i in c(29)) {
   tic()
-  run_scrape(hs2_code = i, sleep_time = 4) %>% suppressMessages()
+  run_scrape(hs2_code = i, hs4_code_start = 15, sleep_time = 4) %>% suppressMessages()
   toc()
   beepr::beep(3)
   Sys.sleep(5)
