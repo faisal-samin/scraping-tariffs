@@ -4,6 +4,7 @@
 library(RSelenium)
 library(tidyverse)
 library(rvest)
+library(netstat) # for free port function
 library(tictoc)
 library(beepr)
 source("functions.R") # source in code for scraper
@@ -36,7 +37,7 @@ eCaps_notimeout =
 
 # Selenium driver kept outside of main function for quick config of ports and browserver
 rD <- rsDriver(browser = "chrome",
-               port = 4350L,
+               port = free_port(),
                chromever="94.0.4606.61",
                version = "3.141.59",
                extraCapabilities = eCaps_notimeout,
@@ -48,24 +49,29 @@ remDr <- rD[["client"]]
 # max waiting time to find element before throwing error (1 second)
 #remDr$setTimeout(type = "implicit", milliseconds = 1000)
 
-# how long to wait until page times out (20 mins)
-remDr$setTimeout(type = "page load", milliseconds = 12000000)
-
-# Run if needed to reset driver and browser client
-remDr$close()
-rD$server$stop()
-rm(rD)
+# how long to wait until page times out (2 mins)
+remDr$setTimeout(type = "page load", milliseconds = 120000)
 
 # Navigating to the URL
 remDr$navigate(url)
 
-# Run scraper (29 remaining)
-for (i in c(29)) {
-  tic()
-  run_scrape(hs2_code = i, hs4_code_start = 22, sleep_time = 4) %>% suppressMessages()
-  toc()
+while(class(try(remDr$getPageSource(header = TRUE), silent = TRUE))=="try-error")
+  {try(remDr$refresh(), silent = TRUE)}
+
+# Run scraper - come back to 29
+for (i in c(46:60)) {
+  run_scrape(i, sleep_time = 4) %>% suppressMessages()
   beepr::beep(3)
   Sys.sleep(5)
 }
 
-# hs3 incomplete, complete rest when function developed
+# Try Catch for page load timeouts
+selected_code <<- 46011001
+while(TRUE){
+    tryCatch({restart_scrape(selected_code)},
+    error = function(e){
+      print("Scraping restarted")
+      return(NULL)
+    })
+}
+

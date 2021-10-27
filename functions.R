@@ -1,28 +1,21 @@
 # Set of functions for different parts of the scraping pipeline
 
-# sleep_time <- 8
-run_scrape <- function(hs2_code, hs4_code_start = NULL, sleep_time) {
-  # Inputs: selected hs2_code to scrape, sleep time in seconds between each click of year or code
-  # Inputs: (optional) hs4_code to start from
+run_scrape <- function(hs_code, sleep_time) {
+  # Inputs: hs_code, if longer than 2 digits, it will resume scrape from that code
   # Outputs: returns dataframe with scraped data
-  # Issues: this only works for one HS2 code at a time
   
+  # convert to string
+  hs_str <- as.character(hs_code)
+
   # Navigating to the URL = this is to refresh the page to avoid issue with hs2 code
   remDr$navigate(url)
   
   # Refresh live html along with remDr elements of interest (hs code list, years)
   refresh_elements()
   
+  # Select hs2 code and move mouse to hs2 code
+  remDr$mouseMoveToLocation(webElement = elem_hs2[[as.integer(substr(hs_str, 1, 2))]])
   
-  # initiate master df
-  df_master <- initiate_df()
-  
-  # Testing elem codes - optional
-  # sapply(elem_hs6, function(x) x$getElementText())
-
-  # Select hs2 code
-  # move mouse to hs2 code
-  remDr$mouseMoveToLocation(webElement = elem_hs2[[hs2_code]])
   # pause until hs2 code is in view
   Sys.sleep(1)
   #click
@@ -31,8 +24,21 @@ run_scrape <- function(hs2_code, hs4_code_start = NULL, sleep_time) {
   Sys.sleep(6)
   refresh_elements()
   
+  # Initiate dataframes at each level if missing
+  if(!exists("df_hs4")){df_hs4 <<- initiate_df()}
+  if(!exists("df_hs6")){df_hs6 <<- initiate_df()}
+  if(!exists("df_hs8")){df_hs8 <<- initiate_df()}
+  
   # 1st loop - loop through HS4 codes
-  df_hs4 <<- initiate_df()
+  # if the selected code is 2 digits, i.e. it's not a restart
+  if(nchar(hs_str) == 2){
+    # start index from 1
+    hs4_code_start <- 1
+  } else {
+    # pick out index from input code
+    hs4_code_start <- map_hs_index(substr(hs_str, 1, 4))
+  }
+
   for (i in hs4_code_start:length(elem_hs4)){
     
     # move mouse to hs4 code
@@ -42,10 +48,17 @@ run_scrape <- function(hs2_code, hs4_code_start = NULL, sleep_time) {
     
     Sys.sleep(6)
     refresh_elements()
+    # if the selected code is 2 digits, i.e. it's not a restart
+    if(nchar(hs_str) == 2){
+      # start index from 1
+      hs6_code_start <- 1
+    } else {
+      # pick out index from input code
+      hs6_code_start <- map_hs_index(substr(hs_str, 1, 6))
+    }
     
-    df_hs6 <<- initiate_df()
     # 2nd loop - loop through HS6 codes
-    for (i in 16:length(elem_hs6)) {
+    for (i in hs6_code_start:length(elem_hs6)) {
       
       # move mouse to hs6 code
       remDr$mouseMoveToLocation(webElement = elem_hs6[[i]])
@@ -56,22 +69,29 @@ run_scrape <- function(hs2_code, hs4_code_start = NULL, sleep_time) {
       refresh_elements()
       
       # 3rd loop - loop through HS8 codes
-      df_hs8 <<- initiate_df()
-      for (i in 1:length(elem_hs8)) {
+      if(nchar(hs_str) == 2){
+        # start index from 1
+        hs8_code_start <- 1
+      } else {
+        # pick out index from input code
+        hs8_code_start <- map_hs_index(substr(hs_str, 1, 8))
+        # once the hs8 code has been scraped, we treat the rest of the code like normal, hence new hs_str
+        hs_str <- substr(hs_str, 1, 2)
+      }
+      
+      for (i in hs8_code_start:length(elem_hs8)) {
         # move mouse to hs8 code
         remDr$mouseMoveToLocation(webElement = elem_hs8[[i]])
         #click
         remDr$click(1)
-        
-        #print(paste0("Sleeping.... zzz ", Sys.time()))
+
         # sleep to wait for tables to load
         Sys.sleep(6)
-        #print(paste0("Awake! ", Sys.time()))
         
         refresh_elements()
         
         # Store selected HS8 code
-        selected_code <- elem_hs8[[i]]$getElementText()[[1]]
+        selected_code <<- elem_hs8[[i]]$getElementText()[[1]]
         
         # 5th loop - loop through each year (we only want 2020 and 2019)
         df_year <<- initiate_df()
@@ -83,11 +103,21 @@ run_scrape <- function(hs2_code, hs4_code_start = NULL, sleep_time) {
           # move mouse to year
           remDr$mouseMoveToLocation(webElement = elem_year[[i]])
           # and then click
+          
+          # TO DO - build error handling around this click in the case of timeouts
           remDr$click(1)
           Sys.sleep(sleep_time)
           
           exports_valor <- NULL
+          counter <- 0
           while(is.null(exports_valor)) {
+            counter <- counter + 1
+            print(counter)
+            if(counter == 10){
+              restart_scrape(selected_code)
+              return()
+            }
+            
             exports_valor <- tryCatch({
               Sys.sleep(3)
               refresh_elements()
@@ -117,15 +147,19 @@ run_scrape <- function(hs2_code, hs4_code_start = NULL, sleep_time) {
         } # end of 4th loop
         # bind year loop with hs8 df
         df_hs8 <<- bind_rows(df_hs8, df_year) %>% unique() # safeguard against duplicates
-      } # end of 3rd loop
+        } # end of 3rd loop
       df_hs6 <<- bind_rows(df_hs6, df_hs8)
+      df_hs8 <<- initiate_df() # wipe clean for next iteration
     } # end of 2nd loop
     df_hs4 <<- bind_rows(df_hs4, df_hs6)
+    df_hs6 <<- initiate_df()
   } # end of 1st loop
-  df_hs4 %>% write_csv(paste0("data/hs", hs2_code, "_data.csv"))
+  df_hs4 %>% write_csv(paste0("data/hs", substr(hs_str, 1, 2), "_data.csv"))
+  df_hs4 <<- initiate_df()
+  rm(df_hs4, df_hs6, df_hs8) # required to start fresh with next loop
 }
 
-#df_hs4 %>% write_csv(paste0("data/hs", "39", "_data_incomplete.csv"))
+# df_hs4 %>% write_csv(paste0("data/hs", "29", "_data.csv"))
 
 gather_hs_codes <- function(xpath_hs) {
   # gathers HS codes in the form of Selenium Elements at the given xpath
@@ -207,10 +241,13 @@ cleanup <- function() {
   # Inputs: none
   # Outputs: none
   # Issues: assumes remDr and rD variables 
+  out <- tryCatch({
+      remDr$close()
+      rD$server$stop()
+      rm(rD)},
+    error = function(e){return(NULL)})
   
-  remDr$close()
-  rD$server$stop()
-  rm(rD)
+  return(out)
 }
 refresh_elements <- function() {
   # Whenever the page is clicked/updated, all remDr elements need to be refreshed
@@ -228,8 +265,99 @@ refresh_elements <- function() {
   elem_hs8 <<- gather_hs_codes('//*[@id="idfra"]/option')
   elem_year <<- remDr$findElements(using = "xpath", '//*[@id="tabla"]/span[1]/a')
 }
-
-
+restart_scrape <- function(selected_code) {
+  # invoked when more than 10 tryCatch errors occur 
+  
+  # close session
+  cleanup()
+  
+  # Website to scrape
+  url = "http://www.economia-snci.gob.mx/siavi5/fraccion.php"
+  
+  # Chrome prefs and args for scraper
+  chrome_prefs = 
+    list(  
+      # chrome prefs
+      "profile.default_content_settings.popups" = 0L,
+      "download.prompt_for_download" = FALSE)
+  
+  chrome_args = list(
+    '--window-size=1200,1800')
+  
+  eCaps_notimeout = 
+    list(chromeOptions = 
+           list(
+             prefs = chrome_prefs,
+             args = chrome_args 
+           ))
+  
+  # Selenium driver kept outside of main function for quick config of ports and browserver
+  rD <<- rsDriver(browser = "chrome",
+                 port = free_port(),
+                 chromever="94.0.4606.61",
+                 version = "3.141.59",
+                 extraCapabilities = eCaps_notimeout,
+                 check = FALSE)
+  
+  # Assigns browser client to an object, remDr
+  remDr <<- rD[["client"]]
+  
+  # how long to wait until page times out (2 mins)
+  remDr$setTimeout(type = "page load", milliseconds = 120000)
+  
+  Sys.sleep(2)
+  
+  # Navigating to the URL
+  remDr$navigate(url)
+  
+  Sys.sleep(1)
+  
+  # Load in existing dataframe (if it exists)
+  tryCatch({
+    df_hs4 <<- read_csv(paste0("data/hs", substr(selected_code, 1, 2) , "_data.csv"),
+                        col_types = cols(.default = "c"))},
+    error = function(e){
+      return(NULL)
+    })
+  
+  # resume scrape for just that hs2 code
+  tic()
+  run_scrape(selected_code, sleep_time = 4) %>% suppressMessages()
+  toc()
+  beepr::beep(5)
+  Sys.sleep(5)
+  
+   
+  hs2_resume <- substr(selected_code, 1, 2) %>% as.integer() + 1
+  # continue scrape after previous hs2 complete
+  for (i in c(hs2_resume:97)) {
+    tic()
+    run_scrape(i, sleep_time = 4) %>% suppressMessages()
+    toc()
+    beepr::beep(3)
+    Sys.sleep(5)
+  }
+}
+map_hs_index <- function(code) {
+  # code: 2, 4, 6 or 8 digit code used in the restart_scrape function
+  code_str <- as.character(code)
+  if(nchar(code_str) == 2){
+    list_of_codes <- purrr::map(elem_hs2, function(x) x$getElementText()[[1]]) %>% unlist()
+    list_index <- which(list_of_codes == substr(code_str, 1, 2))
+    return(list_index)}
+  else if(nchar(code_str) == 4){
+    list_of_codes <- purrr::map(elem_hs4, function(x) x$getElementText()[[1]]) %>% unlist()
+    list_index <- which(list_of_codes == substr(code_str, 1, 4))
+    return(list_index)}
+  else if(nchar(code_str) == 6){
+    list_of_codes <- purrr::map(elem_hs6, function(x) x$getElementText()[[1]]) %>% unlist()
+    list_index <- which(list_of_codes == substr(code_str, 1, 6))
+    return(list_index)}
+  else if(nchar(code_str) == 8){
+    list_of_codes <- purrr::map(elem_hs8, function(x) x$getElementText()[[1]]) %>% unlist()
+    list_index <- which(list_of_codes == substr(code_str, 1, 8))
+    return(list_index)}
+}
 # Variables ---------------------------------------------------------------
 
 # Column names for scraped table (before bind)

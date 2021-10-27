@@ -221,3 +221,55 @@ df_loop <-  bind_rows(exports_valor,
          year = selected_year)
 
 df_master <- bind_rows(df_master, df_loop)
+
+
+# Developing restart code -------------------------------------------------
+
+# Issue: mapping function input (selected_code), across to pick out the corresponding hs6 element
+
+# code to restart from
+example_code <- "29394201"
+
+# hs2: 29
+# hs4: 39
+# hs6: 42
+# hs8: 01
+
+# hs2 - we can just use the number 
+# hs4,6,8 - we'd rather return the corresponding index to the code as these numbers can be skipped
+
+# elem_hs4, hs6, and hs8 capture lists of selenium elements, we want to design a function which 
+# takes in the i-th code (i being hs4, hs6 or hs8) and returns the order of that code in the list
+
+# so hs6: 42 should return 9
+
+# capture list of codes and unlist to a layer
+list_of_hs6 <- purrr::map(elem_hs6, function(x) x$getElementText()[[1]]) %>% unlist()
+
+# return position
+which(list_of_hs6 == substr(example_code, 1, 6))
+
+map_hs_index <- function(code) {
+  # code: 4,6 or 8 digit code used in the restart_scrape function
+  code_str <- as.character(code)
+  
+  if(nchar(code_str) == 4){
+    list_of_codes <- purrr::map(elem_hs4, function(x) x$getElementText()[[1]]) %>% unlist()
+    list_index <- which(list_of_codes == substr(example_code, 1, 4))
+    return(list_index)}
+  else if(nchar(code_str) == 6){
+    list_of_codes <- purrr::map(elem_hs6, function(x) x$getElementText()[[1]]) %>% unlist()
+    list_index <- which(list_of_codes == substr(example_code, 1, 6))
+    return(list_index)}
+  else if(nchar(code_str) == 8){
+    list_of_codes <- purrr::map(elem_hs8, function(x) x$getElementText()[[1]]) %>% unlist()
+    list_index <- which(list_of_codes == substr(example_code, 1, 8))
+    return(list_index)}
+}
+
+# testing
+map_hs_index("29")
+map_hs_index("293942")
+map_hs_index("2939")
+# hs8 requires clicking
+map_hs_index("29394201")
