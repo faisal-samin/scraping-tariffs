@@ -55,15 +55,19 @@ remDr$setTimeout(type = "page load", milliseconds = 120000)
 # Navigating to the URL
 remDr$navigate(url)
 
-while(class(try(remDr$getPageSource(header = TRUE), silent = TRUE))=="try-error")
-  {try(remDr$refresh(), silent = TRUE)}
-
 # Run scraper - come back to 29
-for (i in c(46:60)) {
-  run_scrape(i, sleep_time = 4) %>% suppressMessages()
-  beepr::beep(3)
-  Sys.sleep(5)
-}
+# TryCatch for page timeouts
+# while(TRUE){
+#   tryCatch({
+#       for (i in c(63:97)) {
+#         run_scrape(i, sleep_time = 4) %>% suppressMessages()
+#         beepr::beep(3)
+#         Sys.sleep(5)
+#       }},
+#       error = function(e){
+#         print("Scraping restarted")
+#         return(NULL)})
+# }
 
 # Try Catch for page load timeouts
 selected_code <<- 46011001
@@ -74,4 +78,9 @@ while(TRUE){
       return(NULL)
     })
 }
+
+# sample_df <- read_csv("data/hs44_data.csv", col_types = cols(.default = "c")) %>% 
+#   filter(substr(hs_code, 1, 2) == "29")
+# 
+# sample_df %>% write_csv("data/hs29_data.csv")
 
