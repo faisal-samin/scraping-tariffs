@@ -14,7 +14,7 @@ run_scrape <- function(hs_code, sleep_time) {
   refresh_elements()
   
   # Select hs2 code and move mouse to hs2 code
-  remDr$mouseMoveToLocation(webElement = elem_hs2[[as.integer(substr(hs_str, 1, 2))]])
+  remDr$mouseMoveToLocation(webElement = elem_hs2[[as.integer(map_hs_index(substr(hs_str, 1, 2)))]])
   
   # pause until hs2 code is in view
   Sys.sleep(1)
@@ -159,7 +159,7 @@ run_scrape <- function(hs_code, sleep_time) {
   rm(df_hs4, df_hs6, df_hs8) # required to start fresh with next loop
 }
 
-# df_hs4 %>% write_csv(paste0("data/hs", "29", "_data.csv"))
+#df_hs4 %>% write_csv(paste0("data/hs", "80", "_data.csv"))
 
 gather_hs_codes <- function(xpath_hs) {
   # gathers HS codes in the form of Selenium Elements at the given xpath

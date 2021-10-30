@@ -70,7 +70,7 @@ remDr$navigate(url)
 # }
 
 # Try Catch for page load timeouts
-selected_code <<- 46011001
+selected_code <<- 81021001
 while(TRUE){
     tryCatch({restart_scrape(selected_code)},
     error = function(e){
